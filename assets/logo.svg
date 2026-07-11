@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 240 60" width="180" height="45" role="img" aria-labelledby="logoTitle">
+  <title id="logoTitle">ندوة الاحتراف</title>
+  <!-- شعار نصي بسيط بخط رفيع وتفصيلة ذهبية، يمثل هوية فاخرة هادئة -->
+  <text x="0" y="38" font-family="'Tajawal', sans-serif" font-size="30" font-weight="700" fill="#1F1B16" letter-spacing="0.5">
+    ندوة<tspan fill="#A9814A"> الاحتراف</tspan>
+  </text>
+  <line x1="2" y1="48" x2="150" y2="48" stroke="#A9814A" stroke-width="1"/>
+</svg>

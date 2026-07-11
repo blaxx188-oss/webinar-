@@ -1,0 +1,106 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>تم التسجيل بنجاح — نراك في الندوة | ندوة الاحتراف</title>
+<meta name="description" content="تم تأكيد تسجيلك في ندوة الاحتراف المجانية. أضف الموعد إلى تقويمك وانضم إلى قناة واتساب للتذكيرات.">
+<meta name="robots" content="noindex, follow">
+<link rel="canonical" href="https://example.com/thank-you.html">
+<link rel="icon" href="assets/images/favicon.png" type="image/png">
+
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Tajawal:wght@400;500;700;800;900&family=IBM+Plex+Sans+Arabic:wght@400;500;600&display=swap">
+<link rel="stylesheet" href="css/style.css">
+
+<!-- GTM: أضف نفس كود GTM من index.html هنا أيضًا -->
+<!--
+<script>(function(w,d,s,l,i){w[l]=w[l]||[];w[l].push({'gtm.start':
+new Date().getTime(),event:'gtm.js'});var f=d.getElementsByTagName(s)[0],
+j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src=
+'https://www.googletagmanager.com/gtm.js?id='+i+dl;f.parentNode.insertBefore(j,f);
+})(window,document,'script','dataLayer','GTM-XXXXXXX');</script>
+-->
+</head>
+<body>
+
+<!--
+<noscript><iframe src="https://www.googletagmanager.com/ns.html?id=GTM-XXXXXXX"
+height="0" width="0" style="display:none;visibility:hidden"></iframe></noscript>
+-->
+
+<header class="site-header is-scrolled">
+  <div class="container site-header__inner">
+    <a href="index.html" class="site-header__logo" aria-label="الصفحة الرئيسية">
+      <img src="assets/logo.svg" alt="شعار ندوة الاحتراف" width="180" height="45">
+    </a>
+  </div>
+</header>
+
+<main>
+  <section class="section hero" style="padding-top: var(--space-5);">
+    <div class="container" style="max-width: 640px; text-align:center;">
+      <div class="modal__icon" style="margin:0 auto var(--space-3);">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="30" height="30"><path d="m4 12 6 6 10-12"/></svg>
+      </div>
+      <h1 class="section-title">تم تأكيد تسجيلك بنجاح 🎉</h1>
+      <p class="section-sub" style="margin-bottom: var(--space-4);">
+        أهلًا بك، احجز الموعد في تقويمك حتى لا يفوتك شيء، وانضم إلى قناة واتساب لاستقبال التذكيرات والتحديثات.
+      </p>
+
+      <div class="hero__media-frame" style="aspect-ratio:16/9; max-width:560px; margin: 0 auto var(--space-4);">
+        <!-- ضع رابط فيديو الترحيب هنا (مثال: YouTube المضمّن) -->
+        <iframe
+          width="100%" height="100%"
+          src="https://www.youtube.com/embed/dQw4w9WgXcQ"
+          title="فيديو ترحيبي"
+          loading="lazy"
+          style="border:0; position:absolute; inset:0;"
+          allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+          allowfullscreen>
+        </iframe>
+      </div>
+
+      <div class="countdown-wrap" style="margin-top:0;">
+        <p class="countdown-label">الوقت المتبقي حتى بداية الندوة</p>
+        <div class="countdown" id="countdown" aria-live="polite">
+          <div class="countdown__item">
+            <div class="countdown__value" id="cd-days">00</div>
+            <div class="countdown__unit">يوم</div>
+          </div>
+          <div class="countdown__sep">:</div>
+          <div class="countdown__item">
+            <div class="countdown__value" id="cd-hours">00</div>
+            <div class="countdown__unit">ساعة</div>
+          </div>
+          <div class="countdown__sep">:</div>
+          <div class="countdown__item">
+            <div class="countdown__value" id="cd-minutes">00</div>
+            <div class="countdown__unit">دقيقة</div>
+          </div>
+          <div class="countdown__sep">:</div>
+          <div class="countdown__item">
+            <div class="countdown__value" id="cd-seconds">00</div>
+            <div class="countdown__unit">ثانية</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="modal__actions" style="margin-top: var(--space-4);">
+        <a href="#" class="btn btn-dark btn-block" id="addToCalendarBtn" target="_blank" rel="noopener">إضافة إلى Google Calendar</a>
+        <a href="#" class="btn btn-outline btn-block" id="whatsappBtn" target="_blank" rel="noopener">الانضمام إلى واتساب</a>
+      </div>
+    </div>
+  </section>
+</main>
+
+<footer class="site-footer">
+  <div class="container">
+    <p>© <span id="year"></span> جميع الحقوق محفوظة.</p>
+  </div>
+</footer>
+
+<script src="js/app.js" data-page="thank-you"></script>
+</body>
+</html>
