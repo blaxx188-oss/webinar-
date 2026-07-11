@@ -1,185 +1,205 @@
 /**
- * =============================================================================
- * ندوة الاحتراف — Code.gs
- * سكربت Google Apps Script لاستقبال بيانات التسجيل، حفظها في Google Sheets،
- * منع التسجيل المكرر، وإرسال رسائل بريد إلكتروني تلقائية.
+ * =========================================================
+ * وضوح | Webinar Registration Backend — Google Apps Script
+ * =========================================================
+ * الوظائف:
+ * 1. استقبال بيانات التسجيل من نموذج صفحة الهبوط (Fetch API).
+ * 2. حفظها في Google Sheets.
+ * 3. منع التسجيل المكرر (بالبريد الإلكتروني أو رقم الجوال).
+ * 4. إرسال بريد ترحيبي تلقائي للمستخدم.
+ * 5. إرسال إشعار بريد للإدارة عند كل تسجيل جديد.
  *
- * خطوات النشر موضحة بالتفصيل في README.md
- * =============================================================================
+ * طريقة النشر: راجع README.md — قسم "نشر Google Apps Script"
+ * =========================================================
  */
 
-/* -----------------------------------------------------------------------
-   0) الإعدادات العامة — عدّل هذه القيم فقط
-   ----------------------------------------------------------------------- */
-var CONFIG = {
-  SHEET_NAME: 'Registrations',           // اسم الشيت الذي سيتم الحفظ فيه
-  ADMIN_EMAIL: 'admin@example.com',      // البريد الذي يستقبل إشعار كل تسجيل جديد
-  WEBINAR_NAME: 'ندوة الاحتراف المجانية',
-  WEBINAR_DATE_TEXT: 'الأحد 10 أغسطس 2026 - الساعة 7:00 مساءً',
-  WEBINAR_JOIN_LINK: 'https://example.com/live', // رابط الانضمام الفعلي للندوة
-  SEND_ADMIN_NOTIFICATION: true
-};
+/* ----------------------- إعدادات عامة ----------------------- */
+// اسم الشيت الذي سيتم الكتابة فيه (سيُنشأ تلقائيًا إن لم يوجد)
+const SHEET_NAME = 'Registrations';
 
-/* -----------------------------------------------------------------------
-   1) نقطة الاستقبال الرئيسية (POST من صفحة التسجيل)
-   ----------------------------------------------------------------------- */
+// البريد الإلكتروني الذي سيصله إشعار عند كل تسجيل جديد
+const ADMIN_EMAIL = 'admin@example.com'; // ⚠️ استبدل هذا ببريدك الإداري
+
+// اسم الويبنار (يُستخدم في نصوص البريد الإلكتروني)
+const WEBINAR_TITLE = 'لماذا تشعر بالضياع رغم نجاحك؟';
+const WEBINAR_DATE_TEXT = 'السبت، 1 أغسطس 2026 — 8:00 مساءً بتوقيت السعودية';
+const WEBINAR_JOIN_URL = 'https://example.com/live'; // ⚠️ استبدل برابط البث الفعلي
+
+/**
+ * نقطة الدخول الرئيسية لطلبات POST القادمة من نموذج التسجيل
+ */
 function doPost(e) {
-  var lock = LockService.getScriptLock();
+  const lock = LockService.getScriptLock();
   lock.waitLock(15000); // منع التعارض عند وصول طلبين في نفس اللحظة
 
   try {
-    var data = parseRequestBody(e);
+    const data = parseRequestData(e);
 
-    var fullName = (data.fullName || '').toString().trim();
-    var email = (data.email || '').toString().trim().toLowerCase();
-    var phone = normalizePhone((data.phone || '').toString().trim());
-
-    // تحقق أساسي من صحة البيانات على مستوى الخادم أيضًا
-    if (!fullName || !isValidEmail(email) || !isValidPhone(phone)) {
-      return jsonResponse({ status: 'error', message: 'بيانات غير صحيحة.' });
+    // ----- التحقق الأساسي من البيانات -----
+    const validation = validateInput(data);
+    if (!validation.valid) {
+      return buildJsonResponse({ status: 'error', message: validation.message });
     }
 
-    var sheet = getOrCreateSheet();
+    const sheet = getOrCreateSheet();
 
-    // التحقق من عدم وجود تسجيل مسبق بنفس البريد أو رقم الجوال
-    if (isDuplicate(sheet, email, phone)) {
-      return jsonResponse({ status: 'duplicate', message: 'هذا البريد أو رقم الجوال مسجل مسبقًا.' });
+    // ----- التحقق من التسجيل المكرر (بالبريد أو الجوال) -----
+    if (isDuplicate(sheet, data.email, data.phone)) {
+      return buildJsonResponse({ status: 'duplicate', message: 'هذا البريد أو رقم الجوال مسجّل مسبقًا.' });
     }
 
-    // إضافة صف جديد بالبيانات
+    // ----- حفظ البيانات في الشيت -----
     sheet.appendRow([
-      new Date(),          // وقت التسجيل
-      fullName,
-      email,
-      phone,
-      data.source || '',   // مصدر التسجيل (رابط الصفحة)
-      data.timestamp || ''
+      new Date(),               // تاريخ ووقت التسجيل
+      data.fullName,
+      data.email,
+      data.phone,
+      data.source || '',
+      data.page || '',
+      'مسجّل'                    // حالة التسجيل
     ]);
 
-    // إرسال بريد التأكيد للمستخدم
-    sendConfirmationEmail(fullName, email);
+    // ----- إرسال بريد ترحيبي للمستخدم -----
+    sendUserConfirmationEmail(data);
 
-    // إرسال إشعار للإدارة
-    if (CONFIG.SEND_ADMIN_NOTIFICATION) {
-      sendAdminNotification(fullName, email, phone);
-    }
+    // ----- إشعار الإدارة -----
+    sendAdminNotificationEmail(data);
 
-    return jsonResponse({ status: 'success', message: 'تم التسجيل بنجاح.' });
+    return buildJsonResponse({ status: 'success', message: 'تم التسجيل بنجاح.' });
 
   } catch (err) {
-    return jsonResponse({ status: 'error', message: 'حدث خطأ في الخادم: ' + err.message });
+    return buildJsonResponse({ status: 'error', message: 'حدث خطأ في الخادم: ' + err.message });
   } finally {
     lock.releaseLock();
   }
 }
 
-/* -----------------------------------------------------------------------
-   2) نقطة اختبار GET (للتأكد من أن الرابط يعمل بعد النشر)
-   ----------------------------------------------------------------------- */
+/**
+ * دعم طلبات GET لأغراض اختبار أن الرابط يعمل فقط
+ */
 function doGet(e) {
-  return jsonResponse({ status: 'ok', message: 'الخدمة تعمل بشكل صحيح.' });
+  return buildJsonResponse({ status: 'ok', message: 'Webinar registration API is running.' });
 }
 
-/* -----------------------------------------------------------------------
-   3) قراءة بيانات الطلب (يدعم JSON المُرسل بصيغة text/plain لتفادي CORS)
-   ----------------------------------------------------------------------- */
-function parseRequestBody(e) {
+/* ----------------------- دوال مساعدة ----------------------- */
+
+/**
+ * تحليل بيانات الطلب القادم (JSON عبر text/plain لتفادي مشاكل CORS)
+ */
+function parseRequestData(e) {
   if (!e || !e.postData || !e.postData.contents) {
-    throw new Error('لا توجد بيانات مرسلة.');
+    throw new Error('لا توجد بيانات في الطلب.');
   }
   return JSON.parse(e.postData.contents);
 }
 
-/* -----------------------------------------------------------------------
-   4) الحصول على الشيت أو إنشاؤه مع رأس الأعمدة إن لم يكن موجودًا
-   ----------------------------------------------------------------------- */
+/**
+ * التحقق الأساسي من صحة البيانات المُرسلة
+ */
+function validateInput(data) {
+  if (!data.fullName || data.fullName.trim().length < 2) {
+    return { valid: false, message: 'الاسم غير صحيح.' };
+  }
+  const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+  if (!data.email || !emailRegex.test(data.email)) {
+    return { valid: false, message: 'البريد الإلكتروني غير صحيح.' };
+  }
+  const phoneRegex = /^(05\d{8}|9665\d{8}|\+9665\d{8})$/;
+  const cleanPhone = (data.phone || '').replace(/\s|-/g, '');
+  if (!phoneRegex.test(cleanPhone)) {
+    return { valid: false, message: 'رقم الجوال غير صحيح.' };
+  }
+  return { valid: true };
+}
+
+/**
+ * إحضار الشيت المخصص للتسجيلات، أو إنشاؤه إذا لم يكن موجودًا
+ */
 function getOrCreateSheet() {
-  var ss = SpreadsheetApp.getActiveSpreadsheet();
-  var sheet = ss.getSheetByName(CONFIG.SHEET_NAME);
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  let sheet = ss.getSheetByName(SHEET_NAME);
 
   if (!sheet) {
-    sheet = ss.insertSheet(CONFIG.SHEET_NAME);
-    sheet.appendRow(['وقت التسجيل', 'الاسم الكامل', 'البريد الإلكتروني', 'رقم الجوال', 'المصدر', 'وقت الإرسال من المتصفح']);
+    sheet = ss.insertSheet(SHEET_NAME);
+    sheet.appendRow(['التاريخ والوقت', 'الاسم الكامل', 'البريد الإلكتروني', 'رقم الجوال', 'المصدر', 'الصفحة', 'الحالة']);
     sheet.setFrozenRows(1);
   }
   return sheet;
 }
 
-/* -----------------------------------------------------------------------
-   5) التحقق من التكرار: مقارنة البريد ورقم الجوال بكل الصفوف الحالية
-   ----------------------------------------------------------------------- */
+/**
+ * التحقق من وجود تسجيل سابق بنفس البريد أو نفس رقم الجوال
+ */
 function isDuplicate(sheet, email, phone) {
-  var lastRow = sheet.getLastRow();
-  if (lastRow < 2) return false; // لا توجد بيانات بعد رأس الجدول
+  const lastRow = sheet.getLastRow();
+  if (lastRow < 2) return false; // فقط صف العناوين موجود
 
-  // الأعمدة: C = البريد الإلكتروني (3), D = رقم الجوال (4)
-  var range = sheet.getRange(2, 3, lastRow - 1, 2).getValues();
+  const range = sheet.getRange(2, 3, lastRow - 1, 2); // الأعمدة: البريد، الجوال
+  const values = range.getValues();
 
-  for (var i = 0; i < range.length; i++) {
-    var existingEmail = (range[i][0] || '').toString().trim().toLowerCase();
-    var existingPhone = normalizePhone((range[i][1] || '').toString().trim());
+  const normalizedEmail = email.trim().toLowerCase();
+  const normalizedPhone = phone.trim().replace(/\s|-/g, '');
 
-    if (existingEmail === email || existingPhone === phone) {
-      return true;
-    }
+  return values.some(row => {
+    const existingEmail = String(row[0]).trim().toLowerCase();
+    const existingPhone = String(row[1]).trim().replace(/\s|-/g, '');
+    return existingEmail === normalizedEmail || existingPhone === normalizedPhone;
+  });
+}
+
+/**
+ * إرسال بريد ترحيبي تلقائي للمستخدم بعد نجاح التسجيل
+ */
+function sendUserConfirmationEmail(data) {
+  const subject = `تم تأكيد تسجيلك في ويبنار: ${WEBINAR_TITLE}`;
+  const body =
+`مرحبًا ${data.fullName}،
+
+يسعدنا تأكيد تسجيلك في الويبنار المجاني:
+"${WEBINAR_TITLE}"
+
+📅 الموعد: ${WEBINAR_DATE_TEXT}
+🔗 رابط الانضمام: ${WEBINAR_JOIN_URL}
+
+سنذكّرك بالموعد قبل بدء الويبنار. نراك هناك!
+
+مع تحياتنا،
+فريق وضوح`;
+
+  try {
+    MailApp.sendEmail(data.email, subject, body);
+  } catch (err) {
+    // لا نوقف تنفيذ الطلب إذا فشل إرسال البريد، فقط نسجل الخطأ
+    Logger.log('فشل إرسال بريد المستخدم: ' + err.message);
   }
-  return false;
 }
 
-/* -----------------------------------------------------------------------
-   6) دوال التحقق من صحة البيانات
-   ----------------------------------------------------------------------- */
-function isValidEmail(email) {
-  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
+/**
+ * إرسال إشعار للإدارة عند كل تسجيل جديد
+ */
+function sendAdminNotificationEmail(data) {
+  const subject = `تسجيل جديد في الويبنار: ${data.fullName}`;
+  const body =
+`تسجيل جديد وصل الآن:
+
+الاسم: ${data.fullName}
+البريد: ${data.email}
+الجوال: ${data.phone}
+المصدر: ${data.source || 'غير محدد'}
+الصفحة: ${data.page || 'غير محدد'}
+الوقت: ${new Date().toLocaleString('ar-SA')}`;
+
+  try {
+    MailApp.sendEmail(ADMIN_EMAIL, subject, body);
+  } catch (err) {
+    Logger.log('فشل إرسال بريد الإدارة: ' + err.message);
+  }
 }
 
-function isValidPhone(phone) {
-  return /^(\+?9665|05)[0-9]{8}$/.test(phone);
-}
-
-function normalizePhone(phone) {
-  // توحيد الصيغة إلى 05xxxxxxxx بغض النظر عن كتابة +966 أو 966 أو 05
-  var cleaned = phone.replace(/\s|-/g, '');
-  if (cleaned.indexOf('+966') === 0) cleaned = '0' + cleaned.substring(4);
-  else if (cleaned.indexOf('966') === 0) cleaned = '0' + cleaned.substring(3);
-  return cleaned;
-}
-
-/* -----------------------------------------------------------------------
-   7) إرسال بريد التأكيد للمستخدم
-   ----------------------------------------------------------------------- */
-function sendConfirmationEmail(fullName, email) {
-  var subject = 'تأكيد التسجيل — ' + CONFIG.WEBINAR_NAME;
-  var body =
-    'مرحبًا ' + fullName + '،\n\n' +
-    'تم تأكيد تسجيلك بنجاح في "' + CONFIG.WEBINAR_NAME + '".\n\n' +
-    'موعد الندوة: ' + CONFIG.WEBINAR_DATE_TEXT + '\n' +
-    'رابط الانضمام: ' + CONFIG.WEBINAR_JOIN_LINK + '\n\n' +
-    'نرحب بك، ونتطلع لرؤيتك في الندوة.\n\n' +
-    'مع تحياتنا.';
-
-  MailApp.sendEmail(email, subject, body);
-}
-
-/* -----------------------------------------------------------------------
-   8) إرسال إشعار للإدارة عند كل تسجيل جديد
-   ----------------------------------------------------------------------- */
-function sendAdminNotification(fullName, email, phone) {
-  var subject = 'تسجيل جديد — ' + CONFIG.WEBINAR_NAME;
-  var body =
-    'تم تسجيل مشترك جديد:\n\n' +
-    'الاسم: ' + fullName + '\n' +
-    'البريد الإلكتروني: ' + email + '\n' +
-    'رقم الجوال: ' + phone + '\n' +
-    'الوقت: ' + new Date().toLocaleString('ar-SA');
-
-  MailApp.sendEmail(CONFIG.ADMIN_EMAIL, subject, body);
-}
-
-/* -----------------------------------------------------------------------
-   9) بناء استجابة JSON موحدة
-   ----------------------------------------------------------------------- */
-function jsonResponse(obj) {
+/**
+ * بناء استجابة JSON موحّدة
+ */
+function buildJsonResponse(obj) {
   return ContentService
     .createTextOutput(JSON.stringify(obj))
     .setMimeType(ContentService.MimeType.JSON);

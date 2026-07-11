@@ -1,504 +1,410 @@
-/* =========================================================================
-   ندوة الاحتراف — app.js
-   Vanilla JavaScript (ES6) — بدون أي مكتبات خارجية
-   ========================================================================= */
-(function () {
-  'use strict';
+/* =========================================================
+   وضوح | Webinar Landing Page — app.js
+   Vanilla JS ES6 — بدون أي مكتبات خارجية
+   ========================================================= */
+'use strict';
 
-  /* -----------------------------------------------------------------------
-     0) الإعدادات العامة — عدّل هذه القيم فقط
-     ----------------------------------------------------------------------- */
-  var CONFIG = {
-    // تاريخ ووقت الندوة بصيغة ISO مع فرق التوقيت (توقيت السعودية +03:00)
-    WEBINAR_DATE_ISO: '2026-08-10T19:00:00+03:00',
+/* -----------------------------------------------------------
+   0. إعدادات عامة — عدّل هذه القيم حسب مشروعك
+   ----------------------------------------------------------- */
+const CONFIG = {
+  // رابط Google Apps Script Web App (بعد النشر) — استبدله برابطك
+  API_URL: 'PASTE_YOUR_GOOGLE_APPS_SCRIPT_WEB_APP_URL_HERE',
 
-    // رابط تطبيق Google Apps Script بعد النشر (Web App URL)
-    APPS_SCRIPT_URL: 'https://script.google.com/macros/s/PASTE_YOUR_DEPLOYMENT_ID_HERE/exec',
+  // تفاصيل الويبنار لأغراض التقويم والعداد
+  WEBINAR_TITLE: 'لماذا تشعر بالضياع رغم نجاحك؟',
+  WEBINAR_DESCRIPTION: 'ويبنار مجاني مباشر حول الوضوح الذهني واتخاذ القرار بثقة.',
+  WEBINAR_DATE_ISO: '2026-08-01T20:00:00+03:00', // موعد بداية الويبنار
+  WEBINAR_DURATION_MIN: 75,
+  WEBINAR_JOIN_URL: 'https://example.com/live', // رابط البث المباشر الفعلي
+  WHATSAPP_GROUP_URL: 'https://chat.whatsapp.com/PASTE_YOUR_GROUP_INVITE_LINK',
 
-    // بيانات إضافة الحدث إلى Google Calendar
-    CALENDAR_EVENT: {
-      title: 'ندوة الاحتراف المجانية',
-      details: 'ندوة مجانية عبر الإنترنت مدتها 60 دقيقة — رابط الانضمام سيصل عبر البريد الإلكتروني.',
-      location: 'أونلاين — الرابط سيصل عبر البريد الإلكتروني وواتساب',
-      // مدة الحدث بالدقائق
-      durationMinutes: 60
-    },
+  // مفتاح Local Storage لمنع التسجيل المكرر من نفس الجهاز
+  LS_KEY: 'webinar_registered_v1'
+};
 
-    // رابط قناة أو مجموعة واتساب للتذكيرات
-    WHATSAPP_LINK: 'https://chat.whatsapp.com/PASTE_YOUR_INVITE_LINK_HERE',
+/* -----------------------------------------------------------
+   1. DataLayer helper — لأغراض GTM / GA4
+   ----------------------------------------------------------- */
+window.dataLayer = window.dataLayer || [];
+function pushEvent(eventName, payload = {}) {
+  window.dataLayer.push({ event: eventName, ...payload });
+  // console.log('[dataLayer]', eventName, payload); // فعّل هذا السطر أثناء التطوير فقط
+}
 
-    // مفتاح التخزين المحلي لمنع إعادة التسجيل من نفس الجهاز
-    STORAGE_KEY: 'webinar_registered_v1'
+document.addEventListener('DOMContentLoaded', () => {
+  pushEvent('page_view', { page: 'landing' });
+
+  initHeaderScroll();
+  initCountdown();
+  initRevealOnScroll();
+  initFAQAccordion();
+  initTestimonialsSlider();
+  initRippleButtons();
+  initScrollDepthTracking();
+  initRegistrationForm();
+  initModalControls();
+  checkAlreadyRegistered();
+});
+
+/* -----------------------------------------------------------
+   2. Header — تغيير الخلفية عند التمرير
+   ----------------------------------------------------------- */
+function initHeaderScroll() {
+  const header = document.getElementById('siteHeader');
+  if (!header) return;
+  const onScroll = () => {
+    header.classList.toggle('scrolled', window.scrollY > 40);
   };
-
-  /* -----------------------------------------------------------------------
-     1) أدوات مساعدة عامة
-     ----------------------------------------------------------------------- */
-  window.dataLayer = window.dataLayer || [];
-  function pushEvent(eventName, extra) {
-    var payload = Object.assign({ event: eventName }, extra || {});
-    window.dataLayer.push(payload);
-    // eslint-disable-next-line no-console
-    console.log('[dataLayer]', payload);
-  }
-
-  function qs(sel, ctx) { return (ctx || document).querySelector(sel); }
-  function qsa(sel, ctx) { return Array.prototype.slice.call((ctx || document).querySelectorAll(sel)); }
-
-  function pad(num) { return String(num).padStart(2, '0'); }
-
-  /* -----------------------------------------------------------------------
-     2) حدث Page View فور تحميل الصفحة
-     ----------------------------------------------------------------------- */
-  pushEvent('page_view', { page_path: window.location.pathname });
-
-  /* -----------------------------------------------------------------------
-     3) شريط تقدّم التمرير + حالة الهيدر عند التمرير
-     ----------------------------------------------------------------------- */
-  var scrollBar = qs('#scrollBar');
-  var siteHeader = qs('#siteHeader');
-
-  function onScroll() {
-    var scrollTop = window.scrollY || document.documentElement.scrollTop;
-    var docHeight = document.documentElement.scrollHeight - window.innerHeight;
-    var percent = docHeight > 0 ? (scrollTop / docHeight) * 100 : 0;
-
-    if (scrollBar) scrollBar.style.width = percent + '%';
-    if (siteHeader) {
-      if (scrollTop > 12) siteHeader.classList.add('is-scrolled');
-      else siteHeader.classList.remove('is-scrolled');
-    }
-  }
   window.addEventListener('scroll', onScroll, { passive: true });
   onScroll();
+}
 
-  /* -----------------------------------------------------------------------
-     4) تتبع عمق التمرير (Scroll Depth) 25% / 50% / 75% / 100%
-     ----------------------------------------------------------------------- */
-  (function scrollDepthTracker() {
-    var fired = { 25: false, 50: false, 75: false, 100: false };
+/* -----------------------------------------------------------
+   3. Countdown Timer
+   ----------------------------------------------------------- */
+function initCountdown() {
+  const wrap = document.getElementById('countdown');
+  const endedMsg = document.getElementById('countdownEnded');
+  if (!wrap) return;
 
-    function check() {
-      var scrollTop = window.scrollY || document.documentElement.scrollTop;
-      var docHeight = document.documentElement.scrollHeight - window.innerHeight;
-      if (docHeight <= 0) return;
-      var percent = (scrollTop / docHeight) * 100;
+  const target = new Date(wrap.dataset.target).getTime();
+  const els = {
+    days: document.getElementById('cd-days'),
+    hours: document.getElementById('cd-hours'),
+    mins: document.getElementById('cd-mins'),
+    secs: document.getElementById('cd-secs')
+  };
 
-      [25, 50, 75, 100].forEach(function (threshold) {
-        if (!fired[threshold] && percent >= threshold - 1) {
-          fired[threshold] = true;
-          pushEvent('scroll_depth', { depth_percent: threshold });
-        }
-      });
-    }
-    window.addEventListener('scroll', check, { passive: true });
-    window.addEventListener('load', check);
-  })();
+  let finishedFired = false;
 
-  /* -----------------------------------------------------------------------
-     5) Scroll Reveal عبر IntersectionObserver
-     ----------------------------------------------------------------------- */
-  (function scrollReveal() {
-    var items = qsa('.reveal');
-    if (!items.length) return;
+  function tick() {
+    const now = Date.now();
+    const diff = target - now;
 
-    if (!('IntersectionObserver' in window)) {
-      items.forEach(function (el) { el.classList.add('is-visible'); });
+    if (diff <= 0) {
+      wrap.style.display = 'none';
+      endedMsg.style.display = 'block';
+      if (!finishedFired) {
+        finishedFired = true;
+        pushEvent('countdown_finished');
+      }
+      clearInterval(timer);
       return;
     }
 
-    var observer = new IntersectionObserver(function (entries) {
-      entries.forEach(function (entry) {
-        if (entry.isIntersecting) {
-          entry.target.classList.add('is-visible');
-          observer.unobserve(entry.target);
-        }
-      });
-    }, { threshold: 0.15, rootMargin: '0px 0px -40px 0px' });
+    const days = Math.floor(diff / (1000 * 60 * 60 * 24));
+    const hours = Math.floor((diff / (1000 * 60 * 60)) % 24);
+    const mins = Math.floor((diff / (1000 * 60)) % 60);
+    const secs = Math.floor((diff / 1000) % 60);
 
-    items.forEach(function (el) { observer.observe(el); });
-  })();
+    els.days.textContent = String(days).padStart(2, '0');
+    els.hours.textContent = String(hours).padStart(2, '0');
+    els.mins.textContent = String(mins).padStart(2, '0');
+    els.secs.textContent = String(secs).padStart(2, '0');
+  }
 
-  /* -----------------------------------------------------------------------
-     6) العداد التنازلي (يعمل في الصفحة الرئيسية وصفحة الشكر)
-     ----------------------------------------------------------------------- */
-  (function countdown() {
-    var elDays = qs('#cd-days');
-    var elHours = qs('#cd-hours');
-    var elMinutes = qs('#cd-minutes');
-    var elSeconds = qs('#cd-seconds');
-    var wrap = qs('#countdown');
-    if (!wrap) return;
+  tick();
+  const timer = setInterval(tick, 1000);
+}
 
-    var target = new Date(CONFIG.WEBINAR_DATE_ISO).getTime();
-    var finishedFired = false;
-
-    function tick() {
-      var now = new Date().getTime();
-      var diff = target - now;
-
-      if (diff <= 0) {
-        wrap.innerHTML = '<div class="countdown--finished">بدأت الندوة الآن 🔴</div>';
-        if (!finishedFired) {
-          finishedFired = true;
-          pushEvent('countdown_finished');
-        }
-        clearInterval(timer);
-        return;
+/* -----------------------------------------------------------
+   4. Scroll Reveal — Intersection Observer (بدون مكتبات)
+   ----------------------------------------------------------- */
+function initRevealOnScroll() {
+  const items = document.querySelectorAll('.reveal');
+  if (!items.length || !('IntersectionObserver' in window)) {
+    items.forEach(el => el.classList.add('in-view'));
+    return;
+  }
+  const observer = new IntersectionObserver((entries) => {
+    entries.forEach(entry => {
+      if (entry.isIntersecting) {
+        entry.target.classList.add('in-view');
+        observer.unobserve(entry.target);
       }
+    });
+  }, { threshold: 0.15 });
 
-      var days = Math.floor(diff / (1000 * 60 * 60 * 24));
-      var hours = Math.floor((diff / (1000 * 60 * 60)) % 24);
-      var minutes = Math.floor((diff / (1000 * 60)) % 60);
-      var seconds = Math.floor((diff / 1000) % 60);
+  items.forEach(el => observer.observe(el));
+}
 
-      updateUnit(elDays, pad(days));
-      updateUnit(elHours, pad(hours));
-      updateUnit(elMinutes, pad(minutes));
-      updateUnit(elSeconds, pad(seconds));
-    }
+/* -----------------------------------------------------------
+   5. FAQ Accordion
+   ----------------------------------------------------------- */
+function initFAQAccordion() {
+  const items = document.querySelectorAll('.faq-item');
+  items.forEach(item => {
+    const btn = item.querySelector('.faq-q');
+    btn.addEventListener('click', () => {
+      const isOpen = item.classList.contains('open');
+      items.forEach(i => i.classList.remove('open'));
+      if (!isOpen) item.classList.add('open');
+    });
+  });
+}
 
-    function updateUnit(el, value) {
-      if (!el) return;
-      if (el.textContent !== value) {
-        el.textContent = value;
-        el.classList.remove('is-tick');
-        // إعادة تشغيل الحركة
-        void el.offsetWidth;
-        el.classList.add('is-tick');
-      }
-    }
+/* -----------------------------------------------------------
+   6. Testimonials Slider (بسيط، بدون مكتبات)
+   ----------------------------------------------------------- */
+function initTestimonialsSlider() {
+  const track = document.getElementById('testiTrack');
+  const nav = document.getElementById('testiNav');
+  if (!track || !nav) return;
 
-    var timer = setInterval(tick, 1000);
-    tick();
-  })();
-
-  /* -----------------------------------------------------------------------
-     7) تأثير Ripple على الأزرار
-     ----------------------------------------------------------------------- */
-  document.addEventListener('click', function (e) {
-    var btn = e.target.closest ? e.target.closest('.btn') : null;
-    if (!btn) return;
-
-    var rect = btn.getBoundingClientRect();
-    var ripple = document.createElement('span');
-    var size = Math.max(rect.width, rect.height);
-    ripple.className = 'ripple';
-    ripple.style.width = ripple.style.height = size + 'px';
-    ripple.style.left = (e.clientX - rect.left - size / 2) + 'px';
-    ripple.style.top = (e.clientY - rect.top - size / 2) + 'px';
-    btn.appendChild(ripple);
-    setTimeout(function () { ripple.remove(); }, 650);
-
-    // تتبع نقرات الأزرار مع تصنيفها عبر data-cta
-    var ctaName = btn.getAttribute('data-cta');
-    if (ctaName) pushEvent('button_click', { cta: ctaName });
+  const cards = track.querySelectorAll('.testi-card');
+  cards.forEach((_, i) => {
+    const dot = document.createElement('button');
+    dot.className = 'testi-dot' + (i === 0 ? ' active' : '');
+    dot.setAttribute('aria-label', `الشهادة رقم ${i + 1}`);
+    dot.addEventListener('click', () => {
+      cards[i].scrollIntoView({ behavior: 'smooth', inline: 'start', block: 'nearest' });
+    });
+    nav.appendChild(dot);
   });
 
-  /* -----------------------------------------------------------------------
-     8) FAQ Accordion
-     ----------------------------------------------------------------------- */
-  (function faqAccordion() {
-    var items = qsa('.faq-item');
-    items.forEach(function (item) {
-      var q = qs('.faq-item__q', item);
-      var a = qs('.faq-item__a', item);
-      if (!q || !a) return;
+  const dots = nav.querySelectorAll('.testi-dot');
+  track.addEventListener('scroll', () => {
+    const index = Math.round(track.scrollLeft / (cards[0].offsetWidth + 24));
+    dots.forEach((d, i) => d.classList.toggle('active', i === index));
+  }, { passive: true });
+}
 
-      q.addEventListener('click', function () {
-        var isOpen = item.classList.contains('is-open');
+/* -----------------------------------------------------------
+   7. Ripple effect على الأزرار
+   ----------------------------------------------------------- */
+function initRippleButtons() {
+  document.querySelectorAll('.btn').forEach(btn => {
+    btn.addEventListener('click', function (e) {
+      const rect = this.getBoundingClientRect();
+      const ripple = document.createElement('span');
+      const size = Math.max(rect.width, rect.height);
+      ripple.className = 'ripple';
+      ripple.style.width = ripple.style.height = `${size}px`;
+      ripple.style.left = `${e.clientX - rect.left - size / 2}px`;
+      ripple.style.top = `${e.clientY - rect.top - size / 2}px`;
+      this.appendChild(ripple);
+      setTimeout(() => ripple.remove(), 650);
 
-        // إغلاق البقية (اختياري: سلوك أكورديون حصري)
-        items.forEach(function (other) {
-          if (other !== item) {
-            other.classList.remove('is-open');
-            qs('.faq-item__q', other).setAttribute('aria-expanded', 'false');
-            qs('.faq-item__a', other).style.maxHeight = null;
-          }
-        });
-
-        if (isOpen) {
-          item.classList.remove('is-open');
-          q.setAttribute('aria-expanded', 'false');
-          a.style.maxHeight = null;
-        } else {
-          item.classList.add('is-open');
-          q.setAttribute('aria-expanded', 'true');
-          a.style.maxHeight = a.scrollHeight + 'px';
-        }
-      });
+      if (this.dataset.analytics) pushEvent(this.dataset.analytics);
     });
-  })();
-
-  /* -----------------------------------------------------------------------
-     9) Testimonials Slider (تلقائي + نقاط)
-     ----------------------------------------------------------------------- */
-  (function testimonialsSlider() {
-    var list = qs('#testiList');
-    var dotsWrap = qs('#testiDots');
-    if (!list || !dotsWrap) return;
-
-    var slides = qsa('.testi__slide', list);
-    var current = 0;
-    var autoplayMs = 6000;
-    var autoplayTimer = null;
-
-    slides.forEach(function (_, i) {
-      var dot = document.createElement('button');
-      dot.className = 'testi__dot' + (i === 0 ? ' is-active' : '');
-      dot.setAttribute('aria-label', 'الانتقال إلى الرأي رقم ' + (i + 1));
-      dot.addEventListener('click', function () { goTo(i); resetAutoplay(); });
-      dotsWrap.appendChild(dot);
-    });
-
-    var dots = qsa('.testi__dot', dotsWrap);
-
-    function goTo(index) {
-      current = (index + slides.length) % slides.length;
-      list.style.transform = 'translateX(' + (current * 100) + '%)';
-      dots.forEach(function (d, i) { d.classList.toggle('is-active', i === current); });
-    }
-
-    function next() { goTo(current + 1); }
-
-    function resetAutoplay() {
-      if (autoplayTimer) clearInterval(autoplayTimer);
-      autoplayTimer = setInterval(next, autoplayMs);
-    }
-
-    // ملاحظة: بما أن الاتجاه RTL، نستخدم اتجاه موجب للسلايدر داخليًا عبر transform
-    goTo(0);
-    resetAutoplay();
-  })();
-
-  /* -----------------------------------------------------------------------
-     10) Toast Notifications
-     ----------------------------------------------------------------------- */
-  function showToast(message, type) {
-    var region = qs('#toastRegion');
-    if (!region) return;
-
-    var toast = document.createElement('div');
-    toast.className = 'toast' + (type ? ' toast--' + type : '');
-    toast.setAttribute('role', 'status');
-    toast.textContent = message;
-    region.appendChild(toast);
-
-    setTimeout(function () {
-      toast.classList.add('is-leaving');
-      setTimeout(function () { toast.remove(); }, 220);
-    }, 3600);
-  }
-
-  /* -----------------------------------------------------------------------
-     11) بناء رابط Google Calendar ورابط واتساب (تُستخدم في الصفحتين)
-     ----------------------------------------------------------------------- */
-  function buildCalendarLink() {
-    var start = new Date(CONFIG.WEBINAR_DATE_ISO);
-    var end = new Date(start.getTime() + CONFIG.CALENDAR_EVENT.durationMinutes * 60000);
-
-    function toGCalFormat(date) {
-      return date.toISOString().replace(/[-:]/g, '').split('.')[0] + 'Z';
-    }
-
-    var params = new URLSearchParams({
-      action: 'TEMPLATE',
-      text: CONFIG.CALENDAR_EVENT.title,
-      dates: toGCalFormat(start) + '/' + toGCalFormat(end),
-      details: CONFIG.CALENDAR_EVENT.details,
-      location: CONFIG.CALENDAR_EVENT.location
-    });
-
-    return 'https://calendar.google.com/calendar/render?' + params.toString();
-  }
-
-  function wireCalendarAndWhatsappButtons() {
-    var calBtns = qsa('#addToCalendarBtn');
-    var waBtns = qsa('#whatsappBtn');
-    var calLink = buildCalendarLink();
-
-    calBtns.forEach(function (btn) {
-      btn.href = calLink;
-      btn.addEventListener('click', function () { pushEvent('button_click', { cta: 'add_to_calendar' }); });
-    });
-    waBtns.forEach(function (btn) {
-      btn.href = CONFIG.WHATSAPP_LINK;
-      btn.addEventListener('click', function () { pushEvent('button_click', { cta: 'whatsapp_join' }); });
-    });
-  }
-  wireCalendarAndWhatsappButtons();
-
-  /* -----------------------------------------------------------------------
-     12) Modal (نافذة النجاح)
-     ----------------------------------------------------------------------- */
-  var modal = qs('#successModal');
-  var modalClose = qs('#modalClose');
-
-  function openModal() {
-    if (!modal) return;
-    modal.classList.add('is-open');
-    document.body.style.overflow = 'hidden';
-  }
-  function closeModal() {
-    if (!modal) return;
-    modal.classList.remove('is-open');
-    document.body.style.overflow = '';
-  }
-  if (modalClose) modalClose.addEventListener('click', closeModal);
-  if (modal) {
-    modal.addEventListener('click', function (e) {
-      if (e.target === modal) closeModal();
-    });
-  }
-  document.addEventListener('keydown', function (e) {
-    if (e.key === 'Escape') closeModal();
   });
+}
 
-  /* -----------------------------------------------------------------------
-     13) التحقق من صحة النموذج + الإرسال عبر Fetch
-     ----------------------------------------------------------------------- */
-  (function registrationForm() {
-    var form = qs('#regForm');
-    if (!form) return;
+/* -----------------------------------------------------------
+   8. Scroll Depth Tracking (25/50/75/100%)
+   ----------------------------------------------------------- */
+function initScrollDepthTracking() {
+  const fired = { 25: false, 50: false, 75: false, 100: false };
 
-    var submitBtn = qs('#submitBtn');
-    var isSubmitting = false;
+  window.addEventListener('scroll', () => {
+    const scrollTop = window.scrollY;
+    const docHeight = document.documentElement.scrollHeight - window.innerHeight;
+    const pct = docHeight > 0 ? Math.round((scrollTop / docHeight) * 100) : 0;
 
-    var validators = {
-      fullName: function (value) { return value.trim().length >= 3; },
-      email: function (value) { return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value.trim()); },
-      phone: function (value) { return /^(\+?9665|05)[0-9]{8}$/.test(value.trim().replace(/\s/g, '')); }
+    [25, 50, 75, 100].forEach(mark => {
+      if (pct >= mark && !fired[mark]) {
+        fired[mark] = true;
+        pushEvent('scroll_depth', { percent: mark });
+      }
+    });
+  }, { passive: true });
+}
+
+/* -----------------------------------------------------------
+   9. Toast Notifications
+   ----------------------------------------------------------- */
+function showToast(message, type = 'success') {
+  const wrap = document.getElementById('toastWrap');
+  if (!wrap) return;
+  const toast = document.createElement('div');
+  toast.className = `toast ${type === 'error' ? 'error' : ''}`;
+  toast.textContent = message;
+  wrap.appendChild(toast);
+  requestAnimationFrame(() => toast.classList.add('show'));
+  setTimeout(() => {
+    toast.classList.remove('show');
+    setTimeout(() => toast.remove(), 400);
+  }, 4000);
+}
+
+/* -----------------------------------------------------------
+   10. Validation Helpers
+   ----------------------------------------------------------- */
+function isValidName(v) { return v.trim().length >= 2; }
+function isValidEmail(v) { return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(v.trim()); }
+function isValidSaudiPhone(v) {
+  const clean = v.trim().replace(/\s|-/g, '');
+  return /^(05\d{8}|9665\d{8}|\+9665\d{8})$/.test(clean);
+}
+
+/* -----------------------------------------------------------
+   11. Registration Form — Fetch API بدون إعادة تحميل الصفحة
+   ----------------------------------------------------------- */
+function initRegistrationForm() {
+  const form = document.getElementById('registerForm');
+  if (!form) return;
+
+  const submitBtn = document.getElementById('submitBtn');
+  let isSubmitting = false;
+
+  form.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    if (isSubmitting) return; // منع الإرسال المزدوج
+
+    pushEvent('start_registration');
+
+    const fullName = document.getElementById('fullName');
+    const email = document.getElementById('email');
+    const phone = document.getElementById('phone');
+
+    let valid = true;
+    [fullName, email, phone].forEach(f => f.closest('.form-group').classList.remove('has-error'));
+
+    if (!isValidName(fullName.value)) {
+      fullName.closest('.form-group').classList.add('has-error');
+      valid = false;
+    }
+    if (!isValidEmail(email.value)) {
+      email.closest('.form-group').classList.add('has-error');
+      valid = false;
+    }
+    if (!isValidSaudiPhone(phone.value)) {
+      phone.closest('.form-group').classList.add('has-error');
+      valid = false;
+    }
+
+    if (!valid) {
+      showToast('يرجى تصحيح الحقول المظلّلة بالأحمر', 'error');
+      return;
+    }
+
+    // منع التسجيل المكرر من نفس الجهاز
+    if (localStorage.getItem(CONFIG.LS_KEY)) {
+      showToast('لقد سجّلت مسبقًا من هذا الجهاز 👍', 'error');
+      openSuccessModal();
+      return;
+    }
+
+    isSubmitting = true;
+    submitBtn.classList.add('loading');
+    submitBtn.disabled = true;
+
+    const payload = {
+      fullName: fullName.value.trim(),
+      email: email.value.trim(),
+      phone: phone.value.trim(),
+      source: document.referrer || 'direct',
+      page: window.location.href,
+      timestamp: new Date().toISOString()
     };
 
-    function setFieldError(field, hasError) {
-      var wrap = field.closest('.form-field');
-      if (!wrap) return;
-      wrap.classList.toggle('has-error', hasError);
-      field.classList.toggle('is-invalid', hasError);
-    }
-
-    function validateForm() {
-      var valid = true;
-      ['fullName', 'email', 'phone'].forEach(function (name) {
-        var field = qs('[name="' + name + '"]', form);
-        var ok = validators[name](field.value);
-        setFieldError(field, !ok);
-        if (!ok) valid = false;
-      });
-      return valid;
-    }
-
-    // إزالة رسالة الخطأ فور الكتابة
-    qsa('input', form).forEach(function (input) {
-      input.addEventListener('input', function () {
-        setFieldError(input, false);
-      });
-    });
-
-    // تتبّع بداية التسجيل عند أول تفاعل مع النموذج
-    var startTracked = false;
-    form.addEventListener('focusin', function () {
-      if (!startTracked) {
-        startTracked = true;
-        pushEvent('start_registration');
-      }
-    });
-
-    form.addEventListener('submit', function (e) {
-      e.preventDefault();
-
-      if (isSubmitting) return; // منع الإرسال المزدوج
-
-      // منع التسجيل المكرر من نفس الجهاز
-      var alreadyRegistered = localStorage.getItem(CONFIG.STORAGE_KEY);
-      if (alreadyRegistered) {
-        showToast('لقد قمت بالتسجيل مسبقًا من هذا الجهاز. تحقق من بريدك الإلكتروني.', 'error');
-        pushEvent('submit_registration', { result: 'already_registered_local' });
-        openModal();
-        return;
-      }
-
-      if (!validateForm()) {
-        showToast('يرجى تصحيح الحقول المظللة قبل المتابعة.', 'error');
-        return;
-      }
-
-      var payload = {
-        fullName: qs('[name="fullName"]', form).value.trim(),
-        email: qs('[name="email"]', form).value.trim(),
-        phone: qs('[name="phone"]', form).value.trim(),
-        source: window.location.href,
-        timestamp: new Date().toISOString()
-      };
-
-      pushEvent('submit_registration', { result: 'attempt' });
-
-      isSubmitting = true;
-      form.classList.add('is-loading');
-      submitBtn.disabled = true;
-
-      fetch(CONFIG.APPS_SCRIPT_URL, {
+    try {
+      const response = await fetch(CONFIG.API_URL, {
         method: 'POST',
-        // text/plain لتفادي مشاكل CORS Preflight مع Google Apps Script
-        headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+        headers: { 'Content-Type': 'text/plain;charset=utf-8' }, // text/plain لتفادي مشاكل CORS مع Apps Script
         body: JSON.stringify(payload)
-      })
-        .then(function (res) { return res.json(); })
-        .then(function (data) {
-          isSubmitting = false;
-          form.classList.remove('is-loading');
-          submitBtn.disabled = false;
+      });
 
-          if (data.status === 'success') {
-            localStorage.setItem(CONFIG.STORAGE_KEY, '1');
-            showToast('تم التسجيل بنجاح! تحقق من بريدك الإلكتروني.', 'success');
-            pushEvent('registration_success');
+      const result = await response.json();
 
-            // Meta Pixel — Lead
-            if (typeof window.fbq === 'function') window.fbq('track', 'Lead');
-            // TikTok Pixel — CompleteRegistration
-            if (window.ttq && typeof window.ttq.track === 'function') window.ttq.track('CompleteRegistration');
+      if (result.status === 'success') {
+        localStorage.setItem(CONFIG.LS_KEY, JSON.stringify({ email: payload.email, date: payload.timestamp }));
+        pushEvent('registration_success', { email: payload.email });
 
-            openModal();
-            form.reset();
-          } else if (data.status === 'duplicate') {
-            localStorage.setItem(CONFIG.STORAGE_KEY, '1');
-            showToast('هذا البريد أو رقم الجوال مسجل مسبقًا.', 'error');
-            pushEvent('submit_registration', { result: 'duplicate' });
-            openModal();
-          } else {
-            showToast('حدث خطأ غير متوقع، يرجى المحاولة مرة أخرى.', 'error');
-            pushEvent('submit_registration', { result: 'error' });
-          }
-        })
-        .catch(function () {
-          isSubmitting = false;
-          form.classList.remove('is-loading');
-          submitBtn.disabled = false;
-          showToast('تعذّر الاتصال بالخادم، يرجى التحقق من الاتصال بالإنترنت.', 'error');
-          pushEvent('submit_registration', { result: 'network_error' });
-        });
+        // Meta Pixel — بعد نجاح التسجيل
+        if (typeof fbq === 'function') fbq('track', 'Lead');
+        // TikTok Pixel — بعد نجاح التسجيل
+        if (typeof ttq !== 'undefined') ttq.track('CompleteRegistration');
+
+        openSuccessModal();
+        form.reset();
+      } else if (result.status === 'duplicate') {
+        showToast('هذا البريد أو الجوال مسجّل مسبقًا', 'error');
+        pushEvent('registration_failed', { reason: 'duplicate' });
+      } else {
+        throw new Error(result.message || 'حدث خطأ غير متوقع');
+      }
+    } catch (err) {
+      console.error(err);
+      showToast('تعذّر إرسال التسجيل، يرجى المحاولة مرة أخرى', 'error');
+      pushEvent('registration_failed', { reason: 'network_error' });
+    } finally {
+      isSubmitting = false;
+      submitBtn.classList.remove('loading');
+      submitBtn.disabled = false;
+    }
+  });
+
+  // إزالة تظليل الخطأ فور التصحيح
+  form.querySelectorAll('input').forEach(input => {
+    input.addEventListener('input', () => {
+      input.closest('.form-group').classList.remove('has-error');
     });
-  })();
+  });
+}
 
-  /* -----------------------------------------------------------------------
-     14) تتبّع تشغيل الفيديو الترحيبي في صفحة الشكر
-     ----------------------------------------------------------------------- */
-  (function videoTracking() {
-    var iframe = qs('iframe[title="فيديو ترحيبي"]');
-    if (!iframe) return;
-    var fired = false;
-    iframe.addEventListener('load', function () {
-      if (fired) return;
-      fired = true;
-      pushEvent('video_play', { video: 'welcome_video' });
-    });
-  })();
+/* -----------------------------------------------------------
+   12. Already registered on this device?
+   ----------------------------------------------------------- */
+function checkAlreadyRegistered() {
+  // لا نفتح المودال تلقائيًا، فقط نجهز الحالة إن احتجنا لاحقًا
+}
 
-  /* -----------------------------------------------------------------------
-     15) السنة الحالية في الفوتر
-     ----------------------------------------------------------------------- */
-  var yearEl = qs('#year');
-  if (yearEl) yearEl.textContent = new Date().getFullYear();
+/* -----------------------------------------------------------
+   13. Success Modal Controls
+   ----------------------------------------------------------- */
+function openSuccessModal() {
+  const modal = document.getElementById('successModal');
+  if (!modal) return;
+  modal.classList.add('active');
+  document.body.style.overflow = 'hidden';
 
-})();
+  document.getElementById('addToCalendarBtn').href = buildGoogleCalendarLink();
+  document.getElementById('joinWhatsappBtn').href = CONFIG.WHATSAPP_GROUP_URL;
+}
+
+function closeSuccessModal() {
+  const modal = document.getElementById('successModal');
+  if (!modal) return;
+  modal.classList.remove('active');
+  document.body.style.overflow = '';
+}
+
+function initModalControls() {
+  const modal = document.getElementById('successModal');
+  const closeBtn = document.getElementById('modalCloseBtn');
+  if (!modal) return;
+
+  closeBtn.addEventListener('click', closeSuccessModal);
+  modal.addEventListener('click', (e) => {
+    if (e.target === modal) closeSuccessModal();
+  });
+  document.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape') closeSuccessModal();
+  });
+}
+
+/* -----------------------------------------------------------
+   14. Google Calendar Link Builder
+   ----------------------------------------------------------- */
+function buildGoogleCalendarLink() {
+  const start = new Date(CONFIG.WEBINAR_DATE_ISO);
+  const end = new Date(start.getTime() + CONFIG.WEBINAR_DURATION_MIN * 60000);
+
+  const fmt = (d) => d.toISOString().replace(/[-:]/g, '').split('.')[0] + 'Z';
+
+  const params = new URLSearchParams({
+    action: 'TEMPLATE',
+    text: CONFIG.WEBINAR_TITLE,
+    dates: `${fmt(start)}/${fmt(end)}`,
+    details: `${CONFIG.WEBINAR_DESCRIPTION}\n\nرابط الانضمام: ${CONFIG.WEBINAR_JOIN_URL}`,
+    location: CONFIG.WEBINAR_JOIN_URL
+  });
+
+  return `https://calendar.google.com/calendar/render?${params.toString()}`;
+}
+
+// إتاحة الدالة عالميًا لاستخدامها في thank-you.html
+window.buildGoogleCalendarLink = buildGoogleCalendarLink;
+window.WEBINAR_CONFIG = CONFIG;
